@@ -1,40 +1,43 @@
-// WRITE SERVER
-// READ FORM REDIS CHANNEL
-// UPDATE UI IN REAL TIME
+/**
+ * Created by xin on 6/13/17.
+ */
+// - get command line arguments
 var argv = require('minimist')(process.argv.slice(2));
+var port = argv['port'];
 var redis_host = argv['redis_host'];
 var redis_port = argv['redis_port'];
-var redis_channel = argv['redis_channel'];
+var subscribe_topic = argv['subscribe_topic'];
 
+// - setup dependency instances
 var express = require('express');
 var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io')(server);
 
+// - setup redis client
 var redis = require('redis');
-console.log('created redis client');
-var redisClient = redis.createClient(redis_port, redis_host);
-redisClient.subscribe(redis_channel);
-console.log('subscribe to redis channel %s', redis_channel);
-
-// when new meaasge arrives, invoke function
-redisClient.on('message', function (channel, message) {
-	console.log(channel,redis_channel)
-	if (channel == redis_channel)  {
-		console.log('message received %s', message)
-		io.sockets.emit('data', message)
-	}
+console.log('Creating a redis client');
+var redisclient = redis.createClient(redis_port, redis_host);
+console.log('Subscribing to redis topic %s', subscribe_topic);
+redisclient.subscribe(subscribe_topic);
+redisclient.on('message', function (channel, message) {
+    console.log(channel)
+    if (channel == subscribe_topic) {
+        console.log('message received %s', message);
+        io.sockets.emit('data', message);
+    }
 });
 
-app.use('/', express.static(__dirname + '/public'));
-app.use('/jquery', express.static(__dirname + '/node_modules/jquery/dist'));
-app.use('/bootstrap', express.static(__dirname + '/node_modules/bootstrap/dist'));
+// - setup webapp routing
+app.use(express.static(__dirname + '/public'));
+app.use('/jquery', express.static(__dirname + '/node_modules/jquery/dist/'));
 app.use('/d3', express.static(__dirname + '/node_modules/d3/'));
 app.use('/nvd3', express.static(__dirname + '/node_modules/nvd3/build/'));
+app.use('/bootstrap', express.static(__dirname + '/node_modules/bootstrap/dist'));
 
-server.listen(3000, function() {
-	console.log('server start at port 3000.')
-})
+server.listen(port, function () {
+    console.log('Server started at port %d.', port);
+});
 
 // - setup shutdown hooks
 var shutdown_hook = function () {
